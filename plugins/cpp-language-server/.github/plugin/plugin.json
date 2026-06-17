@@ -20,6 +20,9 @@
       "args": [
         "@microsoft/cpp-language-server"
       ],
+      "env": {
+        "MSCPPLS_PLUGIN_SOURCE": "public"
+      },
       "fileExtensions": {
         ".cpp": "cpp",
         ".cxx": "cpp",

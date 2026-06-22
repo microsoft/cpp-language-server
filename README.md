@@ -6,10 +6,10 @@ _The Microsoft C++ Language Server is currently in preview and may be subject to
 
 # 🚀 Quick start
 
-1. Install the [`cpp-language-server` plugin from the copilot-plugin marketplace](https://github.com/github/copilot-plugin). From GitHub Copilot CLI, run:
+1. Install the [`cpp-language-server` plugin from the copilot-plugins marketplace](https://github.com/github/copilot-plugins). From within GitHub Copilot CLI, run:
 
    ```text
-   /plugin install cpp-language-server@awesome-copilot
+   /plugin install cpp-language-server@copilot-plugins
    ```
 
    This bundles the language server and auto-updates with the latest version, so you don't need to install the npm package manually.

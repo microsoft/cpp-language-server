@@ -4,48 +4,32 @@ _The Microsoft C++ Language Server is currently in preview and may be subject to
 
 **Microsoft C++ Language Server** brings the same C++ code intelligence used in Visual Studio and VS Code to GitHub Copilot CLI on Windows, macOS, and Linux. It provides fast, accurate understanding of C++ codebases with features like symbol search and semantic navigation.
 
+# Prerequisites
+
+Before you get started, make sure you have:
+
+- An active [GitHub Copilot](https://github.com/features/copilot) subscription
+- [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli) 
+- [npm](https://www.npmjs.com/package/npm?activeTab=readme) 
+
 # 🚀 Quick start
 
-1. Run `npm install -g @microsoft/cpp-language-server`.
+1. Install the [`cpp-language-server` plugin from the copilot-plugins marketplace](https://github.com/github/copilot-plugins). From within GitHub Copilot CLI, run:
+
+   ```text
+   /plugin install cpp-language-server@copilot-plugins
+   ```
+
+   This bundles the language server and auto-updates with the latest version, so you don't need to install the npm package manually.
 2. Run `mscppls --accept-eula --login` to accept the [license terms](https://www.npmjs.com/package/@microsoft/cpp-language-server?activeTab=code) and login to GitHub. An active GitHub Copilot subscription is required.
-3. Create a [`compile_commands.json` file](https://clang.llvm.org/docs/JSONCompilationDatabase.html) for your project. For CMake projects, try [adding `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`](https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html) during configuration, which will create a `compile_commands.json` in the CMake binary (output) directory, or use [this skill](./skills/setup-cpp-language-server/SKILL.md). For MSBuild (vcxproj) projects, see [this sample application](https://github.com/microsoft/msbuild-extractor-sample) to extract `compile_commands.json` from C++ MSBuild projects.
-4. [Create `.github/lsp.json` to configure GitHub Copilot CLI](https://github.com/github/copilot-cli?tab=readme-ov-file#-configuring-lsp-servers) to use the language server.
+3. Create a [`compile_commands.json` file](https://clang.llvm.org/docs/JSONCompilationDatabase.html) for your project. If your CMake or MSBuild (vcxproj) project doesn't already have a `compile_commands.json`, run the [`generate-compile-commands` skill](./plugins/cpp-language-server/skills/generate-compile-commands/SKILL.md) in GitHub Copilot CLI with a prompt like "regenerate compile commands" or "load project" to generate one and configure the language server. If you don't want to use the skill, you can [add `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`](https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html) during configuration for CMake projects, or follow [this sample application](https://github.com/microsoft/msbuild-extractor-sample) to generate the file for MSBuild projects.
 
-```json
-{
-  "lspServers": {
-    "cpp": {
-      "command": "mscppls",
-      "args": ["--lsp-config", ".mscppls/cpp-lsp.json"],
-      "fileExtensions": {
-        ".cpp": "cpp",
-        ".cxx": "cpp",
-        ".c": "cpp",
-        ".cc": "cpp",
-        ".hpp": "cpp",
-        ".hxx": "cpp",
-        ".hh": "cpp",
-        ".h": "cpp"
-      },
-      "requestTimeoutMs": 1000000
-    }
-  }
-}
-```
+   > [!NOTE]
+   > For custom build systems, we recommend [following the guidance provided to generate a project-specific skill](./AUTHORING_EXTRACTOR_SKILL.md) so the steps are reproducible for your team across each build.
 
-5. Create `.mscppls/cpp-lsp.json` to set the path to `compile_commands.json` and the project root directory. All paths in this example are relative to `.mscppls`. Adjust the `compileCommands` path to match your project's build output directory.
-
-```json
-{
-  "version": 1,
-  "repositoryPath": "../",
-  "compileCommands": "../build/compile_commands.json"
-}
-```
-
-6. Launch GitHub Copilot CLI from your project root directory.
-7. Within GitHub Copilot CLI, run `/lsp show`. You should see a "cpp" server running.
-8. Use GitHub Copilot CLI like normal, now with enhanced C++ capabilities. To nudge the agent to use the tools, try adding phrases like "use LSP tools" to your prompt.
+4. Launch GitHub Copilot CLI from your project root directory.
+5. Within GitHub Copilot CLI, run `/lsp show`. You should see a "cpp" server running.
+6. Use GitHub Copilot CLI like normal, now with enhanced C++ capabilities. To nudge the agent to use the tools, try adding phrases like "use LSP tools" to your prompt.
 
 # 📢 Reporting feedback
 
@@ -111,6 +95,17 @@ The Microsoft C++ Language Server depends on 3 configuration files:
 
 By default, logs and caches are stored in a workspace-specific directory under `$TEMP/mscppls`. The log directory can be overridden with the `--log-dir` argument.
 
+## Customizing Copilot CLI launch flags
+
+To customize the command-line flags that GitHub Copilot CLI passes to the Microsoft C++ Language Server, edit [`.github/lsp.json`](https://github.com/github/copilot-cli?tab=readme-ov-file#-configuring-lsp-servers).
+
+The server can be launched with additional flags using either:
+
+- `npx @microsoft/cpp-language-server [additional flags]`
+- `mscppls [additional flags]` (if installed globally via npm)
+
+If you install the package globally, npm adds the `mscppls` executable to your `PATH`.
+
 ## Creating compile_commands.json for CMake-based projects
 
 CMake projects that use the Ninja or Makefile generators can easily create a `compile_commands.json` by setting the [`CMAKE_EXPORT_COMPILE_COMMANDS` variable](https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html) during configuration. For CMake projects that typically use other generators, first check if it is possible as a one-off to configure the project using the Ninja or Makefile generator, as this is the easiest way to get `compile_commands.json`.
@@ -126,6 +121,8 @@ For now, refer to [this sample application](https://github.com/microsoft/msbuild
 ## Creating compile_commands.json for other build systems
 
 Refer to your build system vendor's documentation.
+
+For custom or non-standard builds, we recommend capturing the steps to generate `compile_commands.json` in a project-specific skill so the process is reproducible for you and your team. Once you've worked out the commands needed to produce the file, save them as a skill (for example, in your project's `skills/` directory) following the [GitHub Copilot CLI skills documentation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/create-skills). The [`setup-cpp-language-server` skill](./skills/setup-cpp-language-server/SKILL.md) is a good starting template to adapt.
 
 # Command line options for `mscppls`
 

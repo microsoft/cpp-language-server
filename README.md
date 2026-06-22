@@ -97,7 +97,7 @@ By default, logs and caches are stored in a workspace-specific directory under `
 
 ## Customizing Copilot CLI launch flags
 
-To customize the command-line flags that GitHub Copilot CLI passes to the Microsoft C++ Language Server, edit `.github/lsp.json`.
+To customize the command-line flags that GitHub Copilot CLI passes to the Microsoft C++ Language Server, edit [`.github/lsp.json`](https://github.com/github/copilot-cli?tab=readme-ov-file#-configuring-lsp-servers).
 
 The server can be launched with additional flags using either:
 

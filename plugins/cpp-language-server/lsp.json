@@ -1,0 +1,24 @@
+{
+  "lspServers": {
+    "cpp": {
+      "command": "npx",
+      "args": [
+        "@microsoft/cpp-language-server"
+      ],
+      "env": {
+        "MSCPPLS_PLUGIN_SOURCE": "public"
+      },
+      "fileExtensions": {
+        ".cpp": "cpp",
+        ".cxx": "cpp",
+        ".c": "cpp",
+        ".cc": "cpp",
+        ".hpp": "cpp",
+        ".hxx": "cpp",
+        ".hh": "cpp",
+        ".h": "cpp"
+      },
+      "requestTimeoutMs": 1000000
+    }
+  }
+}

@@ -45,8 +45,8 @@ For MSBuild (`.sln`, `.slnx`, `.vcxproj`), generate `compile_commands.json` with
 Download the pinned release and verify its SHA256 before trusting it. The binary is self-contained, with no .NET runtime needed.
 
 ```powershell
-$version  = 'v0.2.0'
-$expected = '01a5e2d399c3cb84d3136d0b6ef7b84a05900838ddc3b1f710b9394c8c2936ce'
+$version  = 'v0.3.0'
+$expected = '543c5cc6b57a1b3eb46b11e56b8f35a9ca8676106426bde6041ca2dc2e06f13c'
 $exe      = ".tools\msbuild-extractor-sample.exe"
 
 if (-not (Test-Path $exe) -or (Get-FileHash $exe -Algorithm SHA256).Hash -ne $expected.ToUpper()) {

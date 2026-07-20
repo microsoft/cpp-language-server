@@ -60,8 +60,13 @@ Point the extractor at a real `.sln`, `.slnx`, or `.vcxproj` file.
 
 A skill is a folder with a `SKILL.md`: YAML frontmatter (`name`, `description`) plus a body with
 the extraction setup and any project lookup. Prefer a committed `msbuild-extractor.json` config file
-(the extractor auto-detects `./msbuild-extractor.json`, so the skill can run it with no arguments)
-and document only what is different about your repo. The `description` is what makes the assistant
+and document only what is different about your repo. **Where the config lives is the user's choice.**
+The extractor auto-detects `./msbuild-extractor.json` in the current directory, so a config at the
+workspace root lets the skill run the exe with no arguments. But users are free to keep it elsewhere
+(a subdirectory, a shared `build\` or `tools\` folder, a path outside the repo) and point the
+extractor at it with `--config <path>`; command-line flags take precedence over the config file.
+Write the skill to accommodate both — document the auto-detected default, and note that a
+non-standard location just means passing `--config`. The `description` is what makes the assistant
 auto-invoke the skill, so phrase it with the words users type (generate, regenerate, or refresh
 compile commands; set up C++ IntelliSense).
 
@@ -132,9 +137,10 @@ activated EWDK shell and let the extractor read the toolchain from the environme
 
 ## Extraction command
 
-Commit a `msbuild-extractor.json` at the repo root so the extractor runs with no arguments (it
-auto-detects `./msbuild-extractor.json`). For the EWDK, let it read the activated toolchain from the
-environment with `useDevEnv`:
+Commit a `msbuild-extractor.json` so the extractor picks it up. Placing it at the repo root lets the
+extractor auto-detect `./msbuild-extractor.json` and run with no arguments; if you prefer to keep it
+elsewhere, point at it with `--config <path>` — it's your choice. For the EWDK, let it read the
+activated toolchain from the environment with `useDevEnv`:
 
 ```jsonc
 {
@@ -150,6 +156,8 @@ From the activated EWDK shell, in the repo root:
 
 ```powershell
 .tools\msbuild-extractor-sample.exe          # uses ./msbuild-extractor.json
+# or, if the config lives elsewhere:
+.tools\msbuild-extractor-sample.exe --config path\to\msbuild-extractor.json
 ```
 
 Equivalent one-off invocation with explicit flags (no committed config):

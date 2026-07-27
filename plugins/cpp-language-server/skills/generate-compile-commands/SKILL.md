@@ -1,30 +1,34 @@
 ---
 name: generate-compile-commands
-description: Generate compile_commands.json (clang compilation database) for the C++ language server. Covers MSBuild (.sln, .slnx, .vcxproj) via microsoft/msbuild-extractor-sample — driven by a committed msbuild-extractor.json config file — and CMake projects via CMAKE_EXPORT_COMPILE_COMMANDS. Use whenever the user asks to "regenerate compile commands", "regenerate the project", "reload the project", "load the project", "refresh compile commands", set up an msbuild-extractor.json / extractor config, or otherwise needs a fresh compilation database for mscppls.
+description: Generate compile_commands.json (clang compilation database) for the C++ language server. Covers MSBuild (.sln, .slnx, .vcxproj) via microsoft/msbuild-extractor-sample and CMake projects via CMAKE_EXPORT_COMPILE_COMMANDS. Use whenever the user asks to "regenerate compile commands", "regenerate the project", "reload the project", "load the project", "refresh compile commands", or otherwise needs a fresh compilation database for mscppls.
 ---
 
 # Generate compile_commands.json
 
 The C++ language server needs a `compile_commands.json` (clang compilation database) to understand a project. How you produce one depends on the build system: CMake can export it directly, MSBuild needs an external extractor.
 
-Always regenerate `compile_commands.json` when this skill runs, even if one already exists for the project. For MSBuild, write it to `.mscppls\compile_commands.json` at the workspace root (the examples below do this); mscppls auto-discovers any `compile_commands.json` within the workspace, so no `cpp-lsp.json` is required. Add `.mscppls/` to `.gitignore` so the generated database is not committed — but do **commit** the `msbuild-extractor.json` config file (see below) so the whole team regenerates identically. mscppls hot-reloads the file content; `/restart` is only needed after changing the plugin's `lsp.json` or the workspace `cpp-lsp.json` (those are read once at LSP startup).
+Always regenerate `compile_commands.json` when this skill runs, even if one already exists for the project. For MSBuild, write it to `.mscppls\compile_commands.json` at the workspace root (the examples below do this); mscppls auto-discovers any `compile_commands.json` within the workspace, so no `cpp-lsp.json` is required. Add `.mscppls/` to `.gitignore` so it does not get committed. mscppls hot-reloads the file content; `/restart` is only needed after changing the plugin's `lsp.json` or the workspace `cpp-lsp.json` (those are read once at LSP startup).
+
+Do not mix build systems in one database. Which build system applies is a selection decision, not a guess: work through **Selecting the build system** below before running anything, then follow the matching section exactly.
+
+## Selecting the build system (do this first)
+
+Choose the build system before producing anything, in precedence order: (1) explicit user intent (asked for CMake or the MSBuild extractor); (2) committed configuration (a committed `msbuild-extractor.json` declares MSBuild; a committed CMake preset or established configure declares CMake); (3) workspace context (a `.sln`/`.slnx`/`.vcxproj` selected as the workspace or target is MSBuild); (4) the repo's build docs.
+
+**Hard rule (narrow trigger).** Run the MSBuild extractor and reject a CMake- or Ninja-produced `compile_commands.json` only when (a) a committed `msbuild-extractor.json` is present, or (b) the task is explicitly MSBuild, or (c) a specific `.sln`/`.slnx`/`.vcxproj` is the selected workspace or target. Then use the extractor even if a `CMakeLists.txt` also exists; the finish check rejects a CMake-written database. The trigger is the selection decision, not mere presence: an incidental or stale `.sln`/`.slnx`/`.vcxproj` with none of (a)/(b)/(c) holding does not make the task MSBuild and does not reject CMake.
+
+**Inverse guard.** If user intent or committed configuration selects CMake, CMake wins even when a solution file exists, and a CMake-only repo (no committed solution, no `.vcxproj`, no `msbuild-extractor.json`) uses the CMake export path. This rule never forbids CMake outright. **Tie-break:** if both a committed CMake config (`CMakePresets.json`, `CMakeSettings.json`) and a committed `msbuild-extractor.json` exist, explicit user CMake intent still wins; absent explicit CMake intent, the committed `msbuild-extractor.json` makes this an MSBuild extractor task.
 
 ## CMake projects
 
-CMake writes `compile_commands.json` itself; no external extractor needed. Enable it at configure time:
+CMake writes `compile_commands.json` itself; no external extractor needed. Enable it at configure time (or persist it with `set(CMAKE_EXPORT_COMPILE_COMMANDS ON)` in `CMakeLists.txt`):
 
 ```bash
 cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build build
 ```
 
-Or persist it in the project so every configure picks it up:
-
-```cmake
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-```
-
-The file lands at `<build-dir>/compile_commands.json` (whatever directory you passed to `-B`). Point the workspace `cpp-lsp.json` at it:
+The file lands at `<build-dir>/compile_commands.json` (the directory passed to `-B`). Point the workspace `cpp-lsp.json` at it:
 
 ```json
 {
@@ -34,15 +38,94 @@ The file lands at `<build-dir>/compile_commands.json` (whatever directory you pa
 }
 ```
 
-CMake regenerates the file on the next configure (e.g. running `cmake -B build` again, or `cmake --build build` after editing `CMakeLists.txt`). The refresh story for CMake is "re-run cmake configure"; the MSBuild-specific sections below do not apply.
+CMake regenerates it on the next configure (re-run `cmake -B build`, or `cmake --build build` after editing `CMakeLists.txt`). The MSBuild sections below do not apply to CMake.
 
 ## MSBuild projects
 
-For MSBuild (`.sln`, `.slnx`, `.vcxproj`), generate `compile_commands.json` with [`microsoft/msbuild-extractor-sample`](https://github.com/microsoft/msbuild-extractor-sample). Extraction is design-time: it evaluates projects and runs `GetClCommandLines`, it does **not** compile anything.
+For MSBuild (`.sln`, `.slnx`, `.vcxproj`), the **only** correct way to produce `compile_commands.json` is the external extractor [`microsoft/msbuild-extractor-sample`](https://github.com/microsoft/msbuild-extractor-sample). You must run it. Non-negotiable rules for MSBuild projects:
 
-### Get the extractor
+- **Do run the extractor.** For any `.sln`, `.slnx`, or `.vcxproj` project, running the extractor is the required step. Producing a compilation database without it is a failure.
+- **Do not hand-write, guess, or synthesize** a `compile_commands.json`, and do not copy or edit an existing one by hand.
+- **Do not invoke `cl.exe`, `clang`, or `clang-cl` directly** to build a compile database, and do not scrape a build log. The extractor does this correctly via design-time evaluation.
+- **Do not compile the project first.** Extraction is design-time: it evaluates projects and runs `GetClCommandLines`; it does **not** compile anything and does not need build outputs to exist.
 
-Download the pinned release and verify its SHA256 before trusting it. The binary is self-contained, with no .NET runtime needed.
+### Run it directly in one step
+
+The extractor is fast and design-time, so a **single invocation** is expected. Do not explore the repository extensively, run a test build, or re-run the extractor to "confirm" the result. Locate the project file, resolve the configuration once (tiered procedure below), run the command once, and stop. One retry is allowed only after a nonzero extractor exit: if it failed because restore/init-generated props, targets, or package files are missing (common in C++/WinRT and restore-heavy repos), run the repo's documented restore or init once (e.g. `nuget restore`; not a test build), then retry extraction once. After a successful extraction with output present, stop.
+
+1. If a committed `msbuild-extractor.json` names `solutions`, pass exactly that declared solution and pass the config's path with `--config` (Tier 1); skip independent discovery. If the declared solution is missing, fall back to discovery and warn. Otherwise find the primary committed solution at its conventional location (typically a single `.sln` or `.slnx` at the repository root or a top-level source folder). Do not invent a solution name and do not create a new solution.
+2. If there is no solution but a single `.vcxproj`, use `--project <that .vcxproj>`. If several committed solutions exist, pick the primary product solution (conventional root location, or the one the build docs name), not a sample, test, or benchmark solution.
+3. Produce **one real configuration** per source file. Do not pass `--all-configurations`, `--merge`, `--deduplicate`, or `--validate` unless the user explicitly asks: a merged union of all configurations matches no actual build command and is not deterministic across machines with different installed platforms. The correct database contains exactly the switches from one concrete configuration and platform.
+4. Determine the correct configuration and platform with the tiered procedure below, then run the extractor once.
+
+### Choosing the configuration and platform (do this, do not assume)
+
+The correct configuration and platform are the **project's own default**, never a fixed value and never `Debug`/`x64` as an unstated fallback. Resolve in order: (1) **explicit user config/platform**, if named; (2) **committed `msbuild-extractor.json`** (Tier 1 below), authoritative for configuration, platform, and inputs; (3) **the selected solution or project's declared or default configuration and platform** (Tier 2 below), from repository metadata; (4) **if still unresolved**, ask the user in an interactive session, or classify the ambiguity as unresolved and record it in an autonomous run. Never prefer `x64` over `Win32`/`ARM64` or `Debug` over `Release`. Follow the tiers in order.
+
+#### Tier 1: a committed `msbuild-extractor.json` exists (primary, correct by construction)
+
+A committed `msbuild-extractor.json` next to the solution already declares the intended `configuration`, `platform`, and inputs, and reproduces identically on any machine and installed platform set. Pass its path **explicitly** with `--config`, and pass the declared `solutions` value as `--solution`; that plus `-o` is the whole command. Do **not** pass `-c`/`-a` (they would override the committed configuration and platform), and do **not** rely on bare auto-discovery: the v0.3.0 extractor auto-discovers `msbuild-extractor.json` only from the current working directory, so running from any other directory silently falls back to `Debug`/`x64` and produces a wrong-platform database. Passing `--config` is robust to the working directory.
+
+```powershell
+New-Item -ItemType Directory -Path .mscppls -Force | Out-Null
+msbuild-extractor-sample.exe `
+  --config <path>\msbuild-extractor.json `
+  --solution <the declared solution> `
+  -o .mscppls\compile_commands.json
+```
+
+Use a repo-root-relative or absolute path for `--config`. If the declared solution is missing, fall back to Tier 2 discovery and warn. Leave the config file untouched. (A future extractor could auto-discover the config by walking up from the solution directory; until then, pass `--config` explicitly.)
+
+#### Tier 2: no committed config (determine the solution's own default)
+
+This tier applies **only when no committed `msbuild-extractor.json` exists**. If one exists, use Tier 1 (`--config`) and do not derive or pass `-c`/`-a`. With no committed config, do **not** run the extractor bare and silently accept its built-in `Debug`/`x64` fallback, which is correct only when that happens to be this solution's own default. Read the declared default and pass it explicitly with `-c`/`-a`:
+
+- **`.sln`:** the first entry of `GlobalSection(SolutionConfigurationPlatforms)` is the default (for example `Debug|Win32`). If its platform is concrete (`Win32`, `x64`, `ARM64`), use it. If it is an alias (`Mixed Platforms`, `Any CPU`), resolve it through the C++ project's `GlobalSection(ProjectConfigurationPlatforms)` entry (the right-hand side of `{GUID}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32` gives the concrete platform).
+- **`.slnx`:** read the first declared `<BuildType>`/`<Platform>` pair, then validate it against the selected C++ project's available configurations. If the pair is an alias or absent, resolve it through the leaf `.vcxproj`'s `ProjectConfiguration` list (below) rather than guessing.
+- **A lone `.vcxproj`:** the first `ProjectConfiguration` item, or the empty-value defaults guarded by `Condition="'$(Configuration)'==''"` / `Condition="'$(Platform)'==''"`.
+
+Then run the extractor with that exact configuration and platform:
+
+```powershell
+New-Item -ItemType Directory -Path .mscppls -Force | Out-Null
+msbuild-extractor-sample.exe `
+  --solution <the committed .sln or .slnx> `
+  -c <the solution's default configuration> -a <the solution's default platform> `
+  -o .mscppls\compile_commands.json
+```
+
+For a single-project repository with no solution, use `--project <the committed .vcxproj>` with the project's own default `-c`/`-a`. The extractor auto-detects Visual Studio via `vswhere.exe` and resolves the MSVC toolchain automatically.
+
+After a successful Tier 2 run, offer to write a `msbuild-extractor.json` next to the solution capturing that default and recommend committing it, so later runs (via Tier 1 `--config`) and teammates reproduce it without re-deriving, for example:
+
+```json
+{
+  "solutions": ["MySolution.sln"],
+  "configuration": "Debug",
+  "platform": "Win32"
+}
+```
+
+Write `Debug`/`x64` here only if that is genuinely this solution's default. It is not a safe generic value.
+
+#### Never invent a configuration
+
+If you cannot determine the default configuration or platform from the solution and project files: in an interactive session ask the user which they build; in an autonomous run classify the ambiguity as unresolved and record it. Never fall back to `Debug`/`x64` or any guess: a wrong configuration produces a database whose switches do not match how the code is compiled.
+
+### Flags to use and flags to avoid
+
+Changing the flag set changes the entry set, the most common way to produce the wrong database.
+
+- **Tier 1:** `--config <path>` + `--solution` (or `--project`) + `-o`. The committed config supplies configuration and platform, so omit `-c`/`-a` (they would override it).
+- **Tier 2:** add `-c`/`-a` set to the solution's own default; never hardcode `Debug`, `x64`, or any platform.
+- **Do not pass** `--all-configurations`, `--merge`, `--deduplicate`, or `--validate` unless the user asks; `--validate` compiles every TU with `cl.exe` and is slow.
+- **Do not create, edit, or delete a committed `msbuild-extractor.json`.** Authoring a new one is only the offered follow-up after a Tier 2 run.
+
+### If the extractor is not already available
+
+The extractor is typically already built and available: try `msbuild-extractor-sample.exe` on `PATH`, or `.tools\msbuild-extractor-sample.exe`, before downloading. If present, use it and skip the download.
+
+If it is not present, download the pinned release and verify its SHA256 before trusting it. The binary is self-contained, with no .NET runtime needed.
 
 ```powershell
 $version  = 'v0.3.0'
@@ -62,135 +145,35 @@ if (-not (Test-Path $exe) -or (Get-FileHash $exe -Algorithm SHA256).Hash -ne $ex
 }
 ```
 
-When upgrading the pinned version, get the new SHA256 from the `digest` field of the asset at `https://api.github.com/repos/microsoft/msbuild-extractor-sample/releases/latest`.
+When upgrading the pinned version, get the new SHA256 from the `digest` field of the asset at `https://api.github.com/repos/microsoft/msbuild-extractor-sample/releases/latest`. If downloaded to `.tools\`, invoke `.tools\msbuild-extractor-sample.exe` in the recipes above.
 
-### Recommended: a committed `msbuild-extractor.json`
+### Developer environment (fallback only)
 
-**This is the primary MSBuild workflow.** Instead of memorizing extractor flags and re-passing them on every run, commit a single `msbuild-extractor.json` at the workspace root that captures the project inputs and toolchain settings. Everyone (and every agent run) then regenerates the database identically.
-
-The extractor auto-discovers this file: when `--config` is not passed, it loads `msbuild-extractor.json` from the current directory if present. So a committed config reduces the whole invocation to running the exe with no arguments.
-
-**Decision path:** if a `msbuild-extractor.json` already exists, run the extractor with no flags (below). If it does **not** exist, fall back to the raw CLI flags to get a working run, then write out a `msbuild-extractor.json` capturing those settings so it can be committed (see [Fallback: raw CLI flags](#fallback-raw-cli-flags)).
-
-- **Auto-detection:** `msbuild-extractor.json` in the current directory is used automatically; pass `--config <path>` only if it lives elsewhere.
-- **Precedence:** command-line flags override the config file, which overrides built-in defaults. Use flags for one-off overrides, the config for the committed baseline.
-- **Relative paths** in the config resolve from the config file's own directory (so a workspace-root config can reference `src\app\app.vcxproj`, `.mscppls\compile_commands.json`, etc.).
-- At least one `projects` or `solutions` entry is required (in the config or on the command line).
-
-Author (or update) `msbuild-extractor.json` at the workspace root and commit it. Point `output` at `.mscppls\compile_commands.json` so it lands where mscppls auto-discovers it:
-
-```jsonc
-{
-  // Inputs: at least one solutions[] or projects[] entry is required.
-  "solutions": ["myapp.sln"],
-  "configuration": "Debug",
-  "platform": "x64",
-  "output": ".mscppls\\compile_commands.json",
-
-  // Optional but recommended for IntelliSense across configs:
-  // "allConfigurations": true,
-  // "merge": true,
-  // "deduplicate": true
-}
-```
-
-Then generate — no flags needed, the config is auto-detected:
+The default path passes no toolchain-selection flags and lets the extractor resolve MSVC via `vswhere`. Do not add `--use-dev-env` routinely. Use it only when default `vswhere` resolution fails, or when the user explicitly wants to index the already-active Developer environment (a Developer Command Prompt / Developer PowerShell, or a shell where `vcvarsall.bat` set `VCINSTALLDIR`, `INCLUDE`, `LIB`). It makes the extractor honor that environment instead of re-resolving via `vswhere`:
 
 ```powershell
-New-Item -ItemType Directory -Path .mscppls -Force | Out-Null
-.tools\msbuild-extractor-sample.exe          # uses ./msbuild-extractor.json
-# or, if the config lives elsewhere:
-.tools\msbuild-extractor-sample.exe --config path\to\msbuild-extractor.json
-```
-
-Remember: commit `msbuild-extractor.json`, but keep `.mscppls/` in `.gitignore` (the generated database is not committed).
-
-#### CLI flag → config key reference
-
-Every flag in the fallback sections below has a config-file equivalent. Set the committed baseline as keys; reach for the flag only to override for a single run.
-
-| Concern | CLI flag(s) | Config key |
-|---|---|---|
-| Inputs | `--project`, `--solution` (repeatable) | `projects: []`, `solutions: []` |
-| Configuration / platform | `-c`/`--configuration`, `-a`/`--platform` | `configuration`, `platform` |
-| Output / format | `-o`/`--output`, `-f`/`--format` | `output`, `format` (`"standard"`/`"rich"`) |
-| Multi-config | `--all-configurations`, `--merge`, `--deduplicate`, `--prefer-configuration`, `--prefer-platform` | `allConfigurations`, `merge`, `deduplicate`, `preferConfiguration`, `preferPlatform` |
-| Dev-env toolchain | `--use-dev-env` | `useDevEnv` |
-| VS selection | `--vs-instance`, `--vs-path` | `vsInstance`, `vsPath` |
-| Vendored / out-of-process toolchain | `--msbuild-path`, `--vc-targets-path`, `--cl-path`, `--vc-tools-install-dir`, `--solution-dir` | `msBuildPath`, `vcTargetsPath`, `clPath`, `vcToolsInstallDir`, `solutionDir` |
-| MSBuild launch / includes | `--msbuild-launcher`, `--include-path-order` | `msBuildLauncher`, `includePathOrder` |
-| MSBuild properties / env | `--msbuild-property KEY=VALUE`, `--msbuild-env KEY=VALUE` (repeatable) | `msBuildProperties: {}`, `msBuildEnv: {}` (objects) |
-
-`msBuildProperties` and `msBuildEnv` are objects that **merge** with their CLI counterparts (`--msbuild-property` / `--msbuild-env`), with the CLI winning on key collisions — so a committed baseline can be topped up on the command line for a single run.
-
-### Fallback: raw CLI flags
-
-Use these when you don't want a committed config (a one-off run) or need to override the config for a single invocation. Each example below has a config-key equivalent per the table above; prefer moving durable settings into the committed `msbuild-extractor.json`.
-
-**When no `msbuild-extractor.json` exists yet, use the CLI to get a working run — then persist it.** After the extractor succeeds with a given set of flags, write those exact settings out as a `msbuild-extractor.json` at the workspace root (translating each flag to its config key via the table above) and tell the user to commit it. Subsequent runs then need no flags. For example, after a successful `--solution myapp.sln -c Debug -a x64 -o .mscppls\compile_commands.json`, create:
-
-```jsonc
-{
-  "solutions": ["myapp.sln"],
-  "configuration": "Debug",
-  "platform": "x64",
-  "output": ".mscppls\\compile_commands.json"
-}
-```
-
-Only persist flags that succeeded, and omit machine-specific absolute paths that won't be valid on a teammate's checkout (prefer relative paths, which resolve from the config's directory; for an activated hermetic toolchain prefer `"useDevEnv": true` over absolute `msBuildPath`/`clPath`). Don't overwrite an existing `msbuild-extractor.json` without confirming with the user.
-
-For a typical project on a workstation with Visual Studio installed, the extractor auto-detects Visual Studio via `vswhere.exe` and resolves `VCTargetsPath`, `VCToolsInstallDir`, and `cl.exe` automatically. Solution-based extraction is the simplest entry point:
-
-```powershell
-New-Item -ItemType Directory -Path .mscppls -Force | Out-Null
-.tools\msbuild-extractor-sample.exe `
-  --solution myapp.sln `
-  -c Debug -a x64 `
-  -o .mscppls\compile_commands.json
-```
-
-`-c` is `--configuration` (default `Debug`), `-a` is `--platform` (e.g. `x64`, `Win32`, `ARM64`), `-o` is `--output`. `--solution` accepts `.sln` and `.slnx`; it is repeatable for cross-solution work. `--project` works the same way for individual `.vcxproj` files (also repeatable, deduplicates entries). Config equivalents: `solutions`/`projects`, `configuration`, `platform`, `output`.
-
-#### From a Developer Command Prompt or activated vcvars shell
-
-If you launched a Developer Command Prompt / Developer PowerShell for VS, or ran `vcvarsall.bat x64`, the toolchain env vars (`VCINSTALLDIR`, `VCToolsInstallDir`, `INCLUDE`, `LIB`, etc.) are already set in the current shell. Pass `--use-dev-env` to make the extractor honor them rather than re-resolving via `vswhere`:
-
-```powershell
-.tools\msbuild-extractor-sample.exe `
+msbuild-extractor-sample.exe `
   --use-dev-env `
-  --solution myapp.sln `
-  -c Debug -a x64 `
+  --solution <the committed .sln or .slnx> `
   -o .mscppls\compile_commands.json
 ```
 
-This guarantees the LSP indexes against the exact same toolchain the developer is building with. Use it whenever the project depends on a specific VS version, SDK, or side-by-side toolchain that the default `vswhere` heuristic might not pick. Config equivalent: `"useDevEnv": true`.
+(In Tier 2, add `-c`/`-a`.) Like `--vs-instance`, `--list-instances`, and `--msbuild-path`, `--use-dev-env` is an escape hatch for resolution failure or vendored toolchains, not a default-path flag.
 
 #### Multiple VS installs
 
 If `vswhere` picks the wrong one, list and select explicitly:
 
 ```powershell
-.tools\msbuild-extractor-sample.exe --list-instances
-.tools\msbuild-extractor-sample.exe --vs-instance <id> --solution myapp.sln -c Debug -a x64
+msbuild-extractor-sample.exe --list-instances
+msbuild-extractor-sample.exe --vs-instance <id> --solution <the committed .sln or .slnx> -o .mscppls\compile_commands.json
 ```
 
-Config equivalent: pin `"vsInstance": "<id>"` (or `"vsPath"`) in the committed config so every run selects the same install.
+(Add `-c`/`-a` in Tier 2 as above.)
 
-#### Multi-configuration projects
+#### Multiple configurations (only when the user asks)
 
-Prefer the built-in flags over manual merging; they produce one IntelliSense-friendly entry per source file across all configurations:
-
-```powershell
-.tools\msbuild-extractor-sample.exe `
-  --solution myapp.sln `
-  --all-configurations --merge --deduplicate `
-  -o .mscppls\compile_commands.json
-```
-
-Config equivalent: `"allConfigurations": true`, `"merge": true`, `"deduplicate": true` (see the recommended example above).
-
-Skip `--validate` during normal LSP setup. It compiles every TU with `cl.exe /c` and is slow. Reach for it only when debugging the extractor itself.
+Only on explicit request, add `--all-configurations --merge --deduplicate` to merge every configuration into one entry per source file. This union matches no single build command and is not deterministic across machines with different installed platforms. Still skip `--validate` (it compiles every TU with `cl.exe /c` and is slow).
 
 ### Advanced: out-of-process mode for vendored or hermetic-toolchain repos
 
@@ -249,7 +232,7 @@ If the repo needs initialization for its props, targets, and dependencies to res
 
 ### Manual merge fallback
 
-`--all-configurations --merge --deduplicate` handles almost every multi-config case. Reach for a manual merge only when projects genuinely need conflicting `--platform`, `--configuration`, or `--msbuild-property` flags and have to be extracted in separate invocations. Write each invocation's output to a distinct file under `.mscppls\` (e.g. `.mscppls\compile_commands_debug.json`), then merge:
+A manual merge is only for the rare case where the user asks to combine configurations and the projects need conflicting `--platform`, `--configuration`, or `--msbuild-property` flags, requiring separate invocations. Write each output to a distinct file under `.mscppls\` (e.g. `.mscppls\compile_commands_debug.json`), then merge:
 
 ```powershell
 $all = @{}
@@ -262,7 +245,13 @@ Get-ChildItem .mscppls\compile_commands_*.json | ForEach-Object {
 ConvertTo-Json -InputObject @($all.Values) -Depth 6 | Set-Content .mscppls\compile_commands.json -Encoding UTF8
 ```
 
-`@($all.Values)` forces an array even with a single entry; otherwise `ConvertTo-Json` emits a bare object and the file is not a valid compilation database. Because these invocations use conflicting flags they can't be captured by a single config file; keep the shared settings in `msbuild-extractor.json` and pass only the conflicting `--configuration` / `--platform` / `--msbuild-property` overrides on each command line.
+`@($all.Values)` forces an array even with a single entry; otherwise `ConvertTo-Json` emits a bare object, which is not a valid compilation database.
+
+### Finish check
+
+Before finishing, confirm all four: the extractor was invoked in this session; `.mscppls\compile_commands.json` exists; it is nonempty valid JSON (an array of entries); and it was produced by the extractor, not by CMake or Ninja (the accepted file is the extractor's `.mscppls\compile_commands.json`, not a `compile_commands.json` in a CMake build directory).
+
+If the only database present was written by CMake for an MSBuild task under the narrow (a)/(b)/(c) trigger of **Selecting the build system**, the task is not done: run the extractor. On a CMake-only or explicitly-CMake repository, a CMake-produced database is correct and passes.
 
 ## Troubleshooting
 
@@ -270,10 +259,14 @@ These cover the MSBuild extractor path. For CMake, build-system errors come from
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `REGDB_E_INVALIDVALUE`, or compile commands point at the wrong `cl.exe` | In-proc MSBuild picked up a system VS install instead of the repo's vendored toolchain | Switch to out-of-process mode: set `msBuildPath` and pin `vcTargetsPath` / `clPath` in the committed `msbuild-extractor.json` (or pass `--msbuild-path` / `--vc-targets-path` / `--cl-path`) |
-| Extractor hangs | Transitive project-reference evaluation on a deep build graph | Set `"msBuildProperties": { "BuildProjectReferences": "false" }` in the config (or `--msbuild-property BuildProjectReferences=false`) |
-| `--validate` reports missing module `.ifc` | Module producer not built | Build dependencies first, or just skip `--validate` |
-| LSP doesn't see newly extracted entries | mscppls observer is still hashing the new file | Wait a few seconds; mscppls hot-reloads, so do **not** `/restart` |
-| `vswhere` picks the wrong VS install | Multiple VS instances present | `--list-instances`, then pin `"vsInstance": "<id>"` in the config (or `--vs-instance <id>`) |
+| Wrong entries, or database looks like `Debug`/`x64` when the project builds something else | A committed `msbuild-extractor.json` was not passed with `--config`, so cwd auto-discovery missed it and the extractor fell back to `Debug`/`x64`; or the wrong `-c`/`-a`; or extra flags changed the entry set | In Tier 1 pass the committed config explicitly with `--config <path>` (bare auto-discovery only works from the config's own directory); else Tier 2 with `-c`/`-a`; pass no `--all-configurations`/`--merge`/`--deduplicate`/`--validate`; offer to commit a `msbuild-extractor.json` capturing it |
+| `Configuration '...' not found in <project>. Available: ...` | The requested `-c`/`-a` is not one this project defines | Pick the listed pair matching the solution's declared default and re-run |
+| Wrong solution extracted | Several committed solutions exist and a sample/test one was picked | If a committed `msbuild-extractor.json` exists, use its `solutions` entry; otherwise use the primary product solution, not a sample or test one |
+| `compile_commands.json` produced by CMake for an MSBuild task | The CMake path was taken although a committed `msbuild-extractor.json`, an explicit MSBuild task, or a selected `.sln`/`.slnx`/`.vcxproj` made this MSBuild | Under trigger (a)/(b)/(c) of **Selecting the build system**, run the extractor and use its `.mscppls\compile_commands.json`; if the user selected CMake or the repo is CMake-only, the CMake database is correct |
+| `REGDB_E_INVALIDVALUE`, or commands point at the wrong `cl.exe` | In-proc MSBuild picked a system VS install instead of the vendored toolchain | Switch to out-of-process mode with `--msbuild-path` and pin `--vc-targets-path`/`--cl-path` |
+| Extractor hangs | Transitive project-reference evaluation on a deep graph | Add `--msbuild-property BuildProjectReferences=false` |
+| `--validate` reports missing module `.ifc` | Module producer not built | Build dependencies first, or skip `--validate` |
+| LSP doesn't see new entries | mscppls observer is still hashing the new file | Wait a few seconds; mscppls hot-reloads, so do **not** `/restart` |
+| `vswhere` picks the wrong VS install | Multiple VS instances present | `--list-instances` then `--vs-instance <id>` |
 
 For extractor diagnostics, re-run the same command and read its stderr inline; don't redirect to a file.

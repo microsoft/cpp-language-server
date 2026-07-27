@@ -59,19 +59,28 @@ Point the extractor at a real `.sln`, `.slnx`, or `.vcxproj` file.
 ## Designing the SKILL
 
 A skill is a folder with a `SKILL.md`: YAML frontmatter (`name`, `description`) plus a body with
-the pinned extraction command and any project lookup. Keep it generic and document only what is
-different about your repo. The `description` is what makes the assistant auto-invoke the skill,
-so phrase it with the words users type (generate, regenerate, or refresh compile commands; set
-up C++ IntelliSense).
+the extraction setup and any project lookup. Prefer a committed `msbuild-extractor.json` config file
+and document only what is different about your repo. **Where the config lives is the user's choice.**
+The extractor auto-detects `./msbuild-extractor.json` in the current directory, so a config at the
+workspace root lets the skill run the exe with no arguments. But users are free to keep it elsewhere
+(a subdirectory, a shared `build\` or `tools\` folder, a path outside the repo) and point the
+extractor at it with `--config <path>`; command-line flags take precedence over the config file.
+Write the skill to accommodate both — document the auto-detected default, and note that a
+non-standard location just means passing `--config`. The `description` is what makes the assistant
+auto-invoke the skill, so phrase it with the words users type (generate, regenerate, or refresh
+compile commands; set up C++ IntelliSense).
 
 ## What to put in your SKILL
 
-These keep the generated database matched to your real build, so encode them in your `SKILL.md`.
+These keep the generated database matched to your real build, so encode them in your `SKILL.md` —
+preferably as keys in a committed `msbuild-extractor.json` (each flag below has a config-key
+equivalent: `msBuildPath`, `vcTargetsPath`, `clPath`, `useDevEnv`, `configuration`, `platform`,
+`msBuildProperties`), falling back to flags on the extraction command.
 
-Bake into the extraction command:
+Bake into the config (or extraction command):
 
-- Use absolute paths for `--vc-targets-path` and `--cl-path`.
-- Prefer out-of-process mode (`--msbuild-path`) in a vendored repo; when you have an activated developer environment (for example EWDK), `--use-dev-env` can also pin extraction to the intended toolchain.
+- Use absolute paths for `--vc-targets-path`/`vcTargetsPath` and `--cl-path`/`clPath`.
+- Prefer out-of-process mode (`--msbuild-path`/`msBuildPath`) in a vendored repo; when you have an activated developer environment (for example EWDK), `--use-dev-env`/`"useDevEnv": true` can also pin extraction to the intended toolchain.
 - Point at a `.sln` or a specific `.vcxproj`, not a generated or aggregate project file.
 
 Capture as prerequisites or notes in the skill body:
@@ -128,7 +137,30 @@ activated EWDK shell and let the extractor read the toolchain from the environme
 
 ## Extraction command
 
+Commit a `msbuild-extractor.json` so the extractor picks it up. Placing it at the repo root lets the
+extractor auto-detect `./msbuild-extractor.json` and run with no arguments; if you prefer to keep it
+elsewhere, point at it with `--config <path>` — it's your choice. For the EWDK, let it read the
+activated toolchain from the environment with `useDevEnv`:
+
+```jsonc
+{
+  "solutions": ["general\\echo\\kmdf\\kmdfecho.sln"],
+  "configuration": "Debug",
+  "platform": "x64",
+  "useDevEnv": true,
+  "output": "compile_commands.json"
+}
+```
+
 From the activated EWDK shell, in the repo root:
+
+```powershell
+.tools\msbuild-extractor-sample.exe          # uses ./msbuild-extractor.json
+# or, if the config lives elsewhere:
+.tools\msbuild-extractor-sample.exe --config path\to\msbuild-extractor.json
+```
+
+Equivalent one-off invocation with explicit flags (no committed config):
 
 ```powershell
 .tools\msbuild-extractor-sample.exe `
@@ -138,14 +170,28 @@ From the activated EWDK shell, in the repo root:
   -o compile_commands.json
 ```
 
-`--use-dev-env` reads the toolchain environment the EWDK exports (`VCToolsInstallDir`,
+`--use-dev-env` / `"useDevEnv": true` reads the toolchain environment the EWDK exports (`VCToolsInstallDir`,
 `VCTargetsPath`, `WindowsSdkDir`, `INCLUDE`, `LIB`), which pins extraction to the EWDK.
 
 ## Alternative: explicit paths
 
 If you cannot use an activated shell, pin the EWDK tools by hand. On a machine that also has
 Visual Studio installed, prefer the activated shell so the extractor does not pick up the system
-toolchain.
+toolchain. As a committed config (`msbuild-extractor.json`):
+
+```jsonc
+{
+  "solutions": ["general\\echo\\kmdf\\kmdfecho.sln"],
+  "configuration": "Debug",
+  "platform": "x64",
+  "msBuildPath": "D:\\Program Files\\Microsoft Visual Studio\\18\\BuildTools\\MSBuild\\Current\\Bin\\MSBuild.exe",
+  "vcTargetsPath": "D:\\Program Files\\Microsoft Visual Studio\\18\\BuildTools\\MSBuild\\Microsoft\\VC\\v180",
+  "clPath": "D:\\Program Files\\Microsoft Visual Studio\\18\\BuildTools\\VC\\Tools\\MSVC\\14.50.35717\\bin\\Hostx64\\x64\\cl.exe",
+  "output": "compile_commands.json"
+}
+```
+
+Or the equivalent one-off invocation:
 
 ```powershell
 .tools\msbuild-extractor-sample.exe `

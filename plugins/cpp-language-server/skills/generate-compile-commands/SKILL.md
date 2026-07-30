@@ -21,14 +21,56 @@ Choose the build system before producing anything, in precedence order: (1) expl
 
 ## CMake projects
 
-CMake writes `compile_commands.json` itself; no external extractor needed. Enable it at configure time (or persist it with `set(CMAKE_EXPORT_COMPILE_COMMANDS ON)` in `CMakeLists.txt`):
+CMake writes `compile_commands.json` itself; no external extractor needed. It exports the file at **configure** time, so a single configure step is enough. Follow this recipe exactly. Non-negotiable rules for CMake projects:
 
-```bash
-cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build
+- **Use the Ninja generator.** Pass `-G Ninja` explicitly. Do not let CMake pick its default generator (on Windows the default is a Visual Studio generator, which produces a per-configuration MSBuild layout instead of a single `compile_commands.json` at the expected path, or none at all). The generator must be Ninja.
+- **Use the MSVC toolchain (`cl.exe`), never g++ or clang.** Configure from a Developer environment so `cl.exe` is the active compiler (a Developer Command Prompt / Developer PowerShell for VS, or after running `vcvarsall.bat x64`). If any g++, gcc, clang, or clang-cl is on `PATH`, CMake may select it: prevent that by setting the compiler explicitly with `-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl`. The compiler in every entry must be `cl.exe`. Do not use g++, gcc, clang, or clang-cl.
+- **Configure into the in-tree `build` directory.** Pass `-B build`. The file must land at `build\compile_commands.json`. Do not configure into `out\build`, `build\<config>`, a temporary directory, or a session-state path. The tooling only checks `build\compile_commands.json`, `compile_commands.json` (repository root), and `.mscppls\compile_commands.json`.
+- **Enable export.** Pass `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`. Without it CMake writes nothing.
+- **Do not pin a build type.** Do not pass `-DCMAKE_BUILD_TYPE`. The reference output is produced without a build type, so each project applies its own default; forcing a build type (for example Debug) changes the optimization and runtime flags (`/Od /RTC1 -MDd` instead of the project default) and makes every entry differ from the reference.
+- **Do not run a full build to get the file.** Ninja plus `CMAKE_EXPORT_COMPILE_COMMANDS=ON` writes `compile_commands.json` during configure, before anything compiles. A full `cmake --build` is not required and only adds time (and timeout risk). Configure, confirm the file exists, and stop.
+
+### Run it directly in one step
+
+Configure once, from a Developer environment, with all settings pinned:
+
+```powershell
+cmake -S . -B build -G Ninja `
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON `
+  -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
 ```
 
-The file lands at `<build-dir>/compile_commands.json` (the directory passed to `-B`). Point the workspace `cpp-lsp.json` at it:
+`-G Ninja` matches the reference generator. `-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl` forces MSVC even when g++/clang are on `PATH`, and resolves to the same `cl.exe` the Developer environment already provides. `-B build` fixes the output location the tooling checks. Do not add `-DCMAKE_BUILD_TYPE`: the reference is generated without one.
+
+After configure, verify the file is where it must be, then stop:
+
+```powershell
+Test-Path build\compile_commands.json
+```
+
+If it exists, you are done. Do not re-configure to "confirm", do not switch generators, and do not explore the repository further.
+
+### Stale build directory
+
+If `build\CMakeCache.txt` already exists from an earlier configure that used a different generator, build directory, or compiler, remove only the `build` directory and rerun the pinned configure. Do not preserve a cache that points at a non-Ninja generator or a non-MSVC compiler, and do not try to reconfigure over it.
+
+```powershell
+if (Test-Path build\CMakeCache.txt) { Remove-Item build -Recurse -Force }
+```
+
+### Settings to pin and things to avoid
+
+The recipe is deliberately minimal. Each pinned setting maps to a known failure:
+
+- **Pin** `-G Ninja`, `-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl`, `-B build`, and `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`. That set reproduces the reference (Ninja, MSVC, in-tree `build`, export on). Do not pass `-DCMAKE_BUILD_TYPE`; the reference does not pin one, so forcing it makes every entry differ.
+- **Do not** omit `-G Ninja` and accept CMake's default generator: on Windows that selects a Visual Studio generator and the compilation database will not match.
+- **Do not** let CMake auto-detect the compiler when g++, gcc, clang, or clang-cl may be on `PATH`. Configure in a Developer environment and set `CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER` to `cl`.
+- **Do not** change `-B build` to `out\build`, a nested per-config folder, a temp path, or a session-state path. The file must be at `build\compile_commands.json`.
+- **Do not** run a full `cmake --build build` just to produce the file, and do not spend extra turns exploring or reconfiguring. Configure exports the file directly.
+
+### Refresh
+
+CMake regenerates `build\compile_commands.json` on the next configure (re-run the pinned `cmake -S . -B build -G Ninja ...` command above). The refresh story for CMake is "re-run cmake configure"; the MSBuild-specific sections below do not apply. Point the workspace `cpp-lsp.json` at the file if one is used:
 
 ```json
 {
@@ -38,7 +80,15 @@ The file lands at `<build-dir>/compile_commands.json` (the directory passed to `
 }
 ```
 
-CMake regenerates it on the next configure (re-run `cmake -B build`, or `cmake --build build` after editing `CMakeLists.txt`). The MSBuild sections below do not apply to CMake.
+### CMake troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Entries reference g++, gcc, clang, or clang-cl | CMake auto-detected a non-MSVC compiler from `PATH` | Configure from a Developer environment and pass `-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl`; delete `build` and reconfigure |
+| No `compile_commands.json`, or a Visual Studio solution/`.vcxproj` layout appears in `build` | Default (Visual Studio) generator was used | Pass `-G Ninja` explicitly; delete `build` and reconfigure |
+| `build\compile_commands.json` not found by the tooling | Configured into a different directory (`out\build`, a nested config folder, a temp or session path) | Reconfigure with `-B build`; the file must be at `build\compile_commands.json` |
+| Configure succeeds but no database is written | `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` was omitted | Add the flag and reconfigure |
+| `cl` not found during configure | Not in a Developer environment | Start a Developer Command Prompt / Developer PowerShell for VS, or run `vcvarsall.bat x64`, then reconfigure |
 
 ## MSBuild projects
 

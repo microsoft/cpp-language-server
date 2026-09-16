@@ -1,6 +1,6 @@
 # Command line options for `mscppls`
 
-[Documentation index](./README.md)
+[Documentation index](./index.md)
 
 Use these options with `npx @microsoft/cpp-language-server [options]` or `mscppls [options]` if [installed globally](./installation.md#npm). To customize Copilot CLI server startup, add the relevant launch flags to the `args` in your [LSP configuration](./configuration.md#customizing-copilot-cli-launch-flags). Run standalone commands such as `--check` directly in your terminal instead.
 

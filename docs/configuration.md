@@ -1,6 +1,6 @@
 # Configuration
 
-[Documentation index](./README.md)
+[Documentation index](./index.md)
 
 ## Configuration files
 

@@ -1,6 +1,6 @@
 # Supported LSP features
 
-[Documentation index](./README.md)
+[Documentation index](./index.md)
 
 | Feature | Supported | Notes |
 | --- | --- | --- |

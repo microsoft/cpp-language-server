@@ -1,6 +1,6 @@
 # Generating compile commands
 
-[Documentation index](./README.md)
+[Documentation index](./index.md)
 
 The language server uses a [`compile_commands.json` file](https://clang.llvm.org/docs/JSONCompilationDatabase.html) to understand how each translation unit in your project is built. Generate this file with your build system, then follow the [configuration guide](./configuration.md) to point the language server at it or use automatic discovery.
 

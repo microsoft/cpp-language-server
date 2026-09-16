@@ -34,7 +34,7 @@ Before you get started, make sure you have:
 
 ## Documentation
 
-Browse the [documentation index](./docs/README.md) or jump to a topic:
+Browse the [documentation index](./docs/index.md) or jump to a topic:
 
 - <a id="installation"></a>
    <a id="supported-platforms"></a>

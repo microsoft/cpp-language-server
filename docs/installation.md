@@ -1,6 +1,6 @@
 # Installation
 
-[Documentation index](./README.md)
+[Documentation index](./index.md)
 
 ## Copilot CLI plugin
 

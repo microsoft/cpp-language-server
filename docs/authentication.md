@@ -1,6 +1,6 @@
 # Authentication
 
-[Documentation index](./README.md)
+[Documentation index](./index.md)
 
 ## Logging in to GitHub
 

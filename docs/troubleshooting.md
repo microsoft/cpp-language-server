@@ -1,6 +1,6 @@
 # Troubleshooting and feedback
 
-[Documentation index](./README.md)
+[Documentation index](./index.md)
 
 ## Server setup
 

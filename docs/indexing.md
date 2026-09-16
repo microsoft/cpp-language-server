@@ -1,6 +1,6 @@
 # Indexing
 
-[Documentation index](./README.md)
+[Documentation index](./index.md)
 
 ## Semantic symbol indexing (WCI)
 

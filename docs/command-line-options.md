@@ -2,7 +2,7 @@
 
 [Documentation index](./README.md)
 
-Use these options with `npx @microsoft/cpp-language-server [options]` or `mscppls [options]` if [installed globally](./installation.md#npm). To pass options whenever Copilot CLI launches the server, add them to the `args` in your [LSP configuration](./configuration.md#customizing-copilot-cli-launch-flags).
+Use these options with `npx @microsoft/cpp-language-server [options]` or `mscppls [options]` if [installed globally](./installation.md#npm). To customize Copilot CLI server startup, add the relevant launch flags to the `args` in your [LSP configuration](./configuration.md#customizing-copilot-cli-launch-flags). Run standalone commands such as `--check` directly in your terminal instead.
 
 | Option | Description |
 | --- | --- |
@@ -19,6 +19,25 @@ Use these options with `npx @microsoft/cpp-language-server [options]` or `mscppl
 | `--lsp-config <path>` | Optional path to the `cpp-lsp.json` file. If relative, the path will be resolved relative to the current working directory of the `mscppls` process, which is typically the project root when launched from GitHub Copilot CLI. |
 | `--allow-missing-lsp-config` | Enables fallback to automatic `compile_commands.json` discovery when `--lsp-config` is specified but the configuration file does not exist. |
 | `--disable-telemetry` | Permanently disables sending telemetry data. |
+| `--check=<file>` | Fully parses and analyzes a source file using its `compile_commands.json` entry, prints diagnostics, and exits instead of starting an LSP session. See [checking a source file](#check-a-source-file) for exit codes. |
+| `--check-compile-commands=<path>` | Specifies a `compile_commands.json` file or its containing directory to use with `--check`. If omitted, searches upward from the source file's directory for the database. |
+
+## Check a source file
+
+Complete [license acceptance and authentication](./authentication.md) before running a check. The source file must have an entry in the compilation database.
+
+```text
+npx @microsoft/cpp-language-server --check=src/main.cpp --check-compile-commands=build/compile_commands.json
+```
+
+Omit `--check-compile-commands` to search the source file's directory and its parents for `compile_commands.json`. For a database in a separate build directory, pass its path explicitly as shown above. Both options also accept a space-separated value, such as `--check src/main.cpp`.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Analysis completed with no errors; warnings may still be reported. |
+| `1` | Source errors were reported. |
+| `2` | Setup or validation failed, such as a missing file or compilation database, an unresolved include, or an analysis timeout. |
+| `3` | Not authorized; login is required or authentication failed. |
 
 ## Disable telemetry
 

@@ -18,8 +18,10 @@
 | Document Formatting | No | |
 | Range Formatting | No | |
 | On type Formatting | No | |
+| Folding Ranges | Yes | |
 | Rename | No | |
 | Go to Declaration | Yes | |
 | Go to Type Definition | Yes | |
 | Call Hierarchy | Yes | |
 | Pull Diagnostics | Yes | |
+| Workspace Folders | Yes |  |

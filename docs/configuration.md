@@ -10,7 +10,7 @@ The Microsoft C++ Language Server uses the following configuration files:
 2. `.mscppls/cpp-lsp.json` is optional and sets the path to the project root and the path to the `compile_commands.json` file. `repositoryPath` and `compileCommands` can be relative or absolute paths. If relative, they are resolved relative to the directory containing `cpp-lsp.json`. By changing the `--lsp-config` argument in `.github/lsp.json`, `cpp-lsp.json` can be stored at any user-defined path. `version` must always be `1`.
 3. [`compile_commands.json` specifies the command line to build each target](https://clang.llvm.org/docs/JSONCompilationDatabase.html) in the project. Details for how to generate this file depend on the build system the project uses. See [generating compile commands](./compile-commands.md) for build-system-specific guidance.
 
-By default, logs and caches are stored in a workspace-specific directory under `$TEMP/mscppls`. The log directory can be overridden with the `--log-dir` argument.
+By default, logs are stored in a session-specific directory at `$TEMP/mscppls/<session-id>/logs`. Workspace caches are stored in workspace-specific subdirectories under `%LOCALAPPDATA%\mscppls` on Windows or `~/.mscppls` on macOS and Linux. The log directory can be overridden with the `--log-dir` argument.
 
 ## Customizing Copilot CLI launch flags
 

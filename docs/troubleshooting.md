@@ -14,7 +14,7 @@ Launch GitHub Copilot CLI from your project root and run `/lsp show`. You should
 
 ## Logs
 
-Additional detailed logs are stored in a workspace-specific directory under `$TEMP/mscppls`. Before attaching any logs to a public issue, review the content of the log to remove any sensitive information.
+Additional detailed logs are stored in a session-specific directory at `$TEMP/mscppls/<session-id>/logs`. Before attaching any logs to a public issue, review the content of the log to remove any sensitive information.
 
 Use `--log-dir <path>` to choose a log directory and `--log-level <level>` to set logging verbosity from 0 (errors only) to 9 (verbose). The `--stderr` flag keeps standard error output available for debugging. See the [command line reference](./command-line-options.md) and [launch flag configuration](./configuration.md#customizing-copilot-cli-launch-flags).
 

@@ -10,7 +10,7 @@ Start with the [quick start](../README.md#quick-start), then use the guides and 
 | --- | --- |
 | [Installation](./installation.md) | Plugin and npm installation, supported platforms, and Linux dependencies. |
 | [Authentication](./authentication.md) | License acceptance, GitHub login, token storage, and GitHub Enterprise Cloud. |
-| [Generating compile commands](./compile-commands.md) | Compilation databases for CMake, MSBuild, and custom build systems. |
+| [Generating compile commands](./compile-commands.md) | Compilation databases for CMake, MSBuild, and custom build systems; disabling automatic MSBuild extraction and adjusting its timeout. |
 | [Configuration](./configuration.md) | Project configuration, Copilot CLI launch setup, and automatic discovery. |
 | [Indexing](./indexing.md) | Disabling and re-enabling WCI, file exclusions, and additional browse directories. |
 | [Troubleshooting and feedback](./troubleshooting.md) | Setup checks, logs, and issue reporting. |

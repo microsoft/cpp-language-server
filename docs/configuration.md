@@ -51,6 +51,10 @@ This example uses the [global npm installation](./installation.md#npm). For an `
 
 The discovered configuration is cached, so later startups skip the search. Discovery fails if no `compile_commands.json` is found or if more than one is found; in that case, use an explicit `cpp-lsp.json`.
 
+## Automatic MSBuild configuration settings
+
+See [configuring automatic MSBuild configuration](./compile-commands.md#configuring-automatic-msbuild-extraction) to disable automatic configuration or adjust its timeout on Windows. These settings use the per-user state file rather than project configuration and take effect on the next language-server startup.
+
 ## Indexing settings
 
 See [indexing](./indexing.md) for exclude patterns and additional browse directories. To turn off semantic symbol indexing for all repositories, see [disabling WCI](./indexing.md#disabling-wci), which uses the per-user state file rather than project configuration.

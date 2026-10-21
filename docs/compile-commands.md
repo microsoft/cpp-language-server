@@ -4,11 +4,12 @@
 
 The language server uses a [`compile_commands.json` file](https://clang.llvm.org/docs/JSONCompilationDatabase.html) to understand how each translation unit in your project is built. Compiler options, include paths, and preprocessor definitions all affect how the language server interprets your source files. This compilation database supplies the build context needed for accurate Go to Definition, Find References, and other semantic code intelligence.
 
-For MSBuild-based projects on Windows, the language server can [generate this file automatically at startup](#automatic-msbuild-configuration). For other build systems or manual setup, use the guidance below, then follow the [configuration guide](./configuration.md) to point the language server at the file or use automatic discovery.
+Generate this file using the skill or build-system guidance below, then follow the [configuration guide](./configuration.md) to point the language server at the file or use automatic discovery.
+
 
 ## Generate with Copilot CLI
 
-For CMake or manual MSBuild (vcxproj) setup, run the [`generate-compile-commands` skill](../plugins/cpp-language-server/skills/generate-compile-commands/SKILL.md) in GitHub Copilot CLI with a prompt like "regenerate compile commands" or "load project" to generate the file and configure the language server. The skill is included with the `cpp-language-server` plugin. MSBuild projects using automatic configuration do not need a separate skill invocation.
+For CMake or manual MSBuild (vcxproj) setup, run the [`generate-compile-commands` skill](../plugins/cpp-language-server/skills/generate-compile-commands/SKILL.md) in GitHub Copilot CLI with a prompt like "regenerate compile commands" or "load project" to generate the file and configure the language server. The skill is included with the `cpp-language-server` plugin. When the automatic MSBuild configuration experiment is enabled for you, a separate skill invocation is not needed for initial setup at startup. You can still rerun the skill to refresh `compile_commands.json` if your project changes during the CLI session.
 
 If you don't want to use the skill, follow the build-system guidance below.
 
@@ -22,11 +23,17 @@ For AI assistance with this step, try adding [this skill](../skills/setup-cpp-la
 
 ## MSBuild (vcxproj)
 
-To set up an MSBuild-based project, you can either supply a `compile_commands.json` yourself or run the automatic MSBuild configuration built-in to the extension.
+To set up an MSBuild-based project, supply a `compile_commands.json` using the skill or manual guidance below. If the automatic MSBuild configuration experiment is enabled for you on Windows, the language server can generate it instead.
 
 ### Automatic MSBuild configuration
 
-On Windows, the Microsoft C++ Language Server bundles an MSBuild compile commands extractor and runs it automatically during startup when `compile_commands.json` needs to be generated. You do not need to invoke a separate configuration skill for this automatic setup.
+> [!NOTE]
+> Automatic MSBuild configuration is disabled by default. It is available only when the experiment is enabled for you through feature flagging.
+
+On Windows, when the experiment is enabled for you, the Microsoft C++ Language Server runs its bundled MSBuild compile commands extractor automatically during startup when `compile_commands.json` needs to be generated. You do not need to invoke a separate configuration skill for this initial setup.
+
+> [!NOTE]
+> Automatic MSBuild configuration currently runs at startup, not in response to project changes during a CLI session. If your project changes during the session, use the [Copilot CLI skill](#generate-with-copilot-cli) to regenerate `compile_commands.json`. File-system watching to detect these changes is planned for a future update.
 
 The generated compilation database captures your project's compiler options, include paths, and preprocessor definitions. For example, when you ask Copilot to find a function's definition or identify its callers, the language server uses that build context to interpret the code and resolve symbol relationships.
 
@@ -49,7 +56,7 @@ You can disable automatic MSBuild extraction or adjust its timeout in the langua
 
 4. Restart Copilot CLI so the language server reads the updated settings.
 
-`auto_generate_compile_commands_for_msbuild` set to the JSON boolean `false` disables automatic MSBuild extraction. To re-enable it, set the property to `true` and restart the language server again.
+`auto_generate_compile_commands_for_msbuild` set to the JSON boolean `false` disables automatic MSBuild extraction. To re-enable it, set the property to `true` and restart the language server again. Setting this property to `true` does not bypass feature flagging; the experiment must also be enabled for you.
 
 `msbuild_extractor_timeout_seconds` sets the timeout in seconds and applies only when automatic extraction is enabled. In the example above, automatic extraction is disabled, so the 120-second timeout has no effect until you re-enable it. Changes take effect on the next language-server startup.
 
@@ -58,7 +65,7 @@ You can disable automatic MSBuild extraction or adjust its timeout in the langua
 
 ### Generating compile commands manually
 
-If you disable automatic extraction, you can still generate `compile_commands.json` with the [Copilot CLI skill](#generate-with-copilot-cli) or manually.
+If the experiment is not enabled for you or you disable automatic extraction, generate `compile_commands.json` with the [Copilot CLI skill](#generate-with-copilot-cli) or manually.
 
 Refer to [this sample application](https://github.com/microsoft/msbuild-extractor-sample) for an example of how to generate `compile_commands.json` from MSBuild projects. While the sample application is designed to work out-of-the-box for many projects, it may require adaptation for complex projects.
 

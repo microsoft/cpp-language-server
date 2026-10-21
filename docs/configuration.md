@@ -10,6 +10,9 @@ The Microsoft C++ Language Server uses the following configuration files:
 2. `.mscppls/cpp-lsp.json` is optional and sets the path to the project root and the path to the `compile_commands.json` file. `repositoryPath` and `compileCommands` can be relative or absolute paths. If relative, they are resolved relative to the directory containing `cpp-lsp.json`. By changing the `--lsp-config` argument in `.github/lsp.json`, `cpp-lsp.json` can be stored at any user-defined path. `version` must always be `1`.
 3. [`compile_commands.json` specifies the command line to build each target](https://clang.llvm.org/docs/JSONCompilationDatabase.html) in the project. Details for how to generate this file depend on the build system the project uses. See [generating compile commands](./compile-commands.md) for build-system-specific guidance.
 
+> [!NOTE]
+> Automatic MSBuild configuration is disabled by default. It is available only when the experiment is enabled for you through feature flagging. Otherwise, generate `compile_commands.json` using the [compile commands guide](./compile-commands.md).
+
 By default, logs are stored in a session-specific directory at `$TEMP/mscppls/<session-id>/logs`. Workspace caches are stored in workspace-specific subdirectories under `%LOCALAPPDATA%\mscppls` on Windows or `~/.mscppls` on macOS and Linux. The log directory can be overridden with the `--log-dir` argument.
 
 ## Customizing Copilot CLI launch flags
@@ -26,6 +29,8 @@ If you install the package globally, npm adds the `mscppls` executable to your `
 See the [command line reference](./command-line-options.md) for available flags.
 
 ## Minimal configuration (automatic discovery)
+
+Automatic discovery finds an existing compilation database; it does not generate one and is separate from the feature-flagged automatic MSBuild configuration experiment.
 
 If you omit the `--lsp-config` argument (or pass `--allow-missing-lsp-config`), the language server automatically searches each workspace folder for a single `compile_commands.json` and infers the repository root from the workspace folder. In this mode you don't need a `cpp-lsp.json` file or a `repositoryPath`:
 

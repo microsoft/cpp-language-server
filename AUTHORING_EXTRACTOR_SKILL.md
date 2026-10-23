@@ -88,7 +88,7 @@ Capture as prerequisites or notes in the skill body:
 - Restore first if the project's targets come from a package: `msbuild <sln> /t:restore`.
 - Omit `--validate` for IntelliSense setup; it recompiles every file and is slow.
 - Always regenerate fresh; never reuse a stale `compile_commands.json`.
-- Pin the extractor version and verify its SHA256 (releases ship a self-contained single-file exe).
+- Use the extractor installed by the plugin's `sessionStart` hook, not a separate download.
 
 ## Example: Windows driver samples with the EWDK
 
@@ -132,6 +132,7 @@ activated EWDK shell and let the extractor read the toolchain from the environme
 
 ## Prerequisites
 
+- .NET 10 SDK and the extractor installed by the plugin's `sessionStart` hook.
 - Mount the EWDK ISO (for example as `D:`) and start its shell: `D:\LaunchBuildEnv.cmd`.
 - Confirm the toolchain is active: `where cl.exe` resolves under the mounted EWDK.
 
@@ -155,15 +156,16 @@ activated toolchain from the environment with `useDevEnv`:
 From the activated EWDK shell, in the repo root:
 
 ```powershell
-.tools\msbuild-extractor-sample.exe          # uses ./msbuild-extractor.json
+$extractor = (Get-ChildItem "$env:LOCALAPPDATA\mscppls\msbuild-extractor\public\Microsoft.VisualStudio.Cpp.MSBuildExtractor.*\tools\msbuild-extractor-sample.exe" | Select-Object -First 1).FullName
+& $extractor # uses ./msbuild-extractor.json
 # or, if the config lives elsewhere:
-.tools\msbuild-extractor-sample.exe --config path\to\msbuild-extractor.json
+& $extractor --config path\to\msbuild-extractor.json
 ```
 
 Equivalent one-off invocation with explicit flags (no committed config):
 
 ```powershell
-.tools\msbuild-extractor-sample.exe `
+& $extractor `
   --use-dev-env `
   --solution general\echo\kmdf\kmdfecho.sln `
   -c Debug -a x64 `
@@ -194,7 +196,7 @@ toolchain. As a committed config (`msbuild-extractor.json`):
 Or the equivalent one-off invocation:
 
 ```powershell
-.tools\msbuild-extractor-sample.exe `
+& $extractor `
   --msbuild-path "D:\Program Files\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe" `
   --solution general\echo\kmdf\kmdfecho.sln `
   -c Debug -a x64 `

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": ":",
+        "powershell": "if (${env:COPILOT_PLUGIN_ROOT}) { $ps = (Get-Command pwsh -ErrorAction SilentlyContinue).Source; if (-not $ps) { $ps = 'powershell' }; & $ps -NoProfile -ExecutionPolicy Bypass -NonInteractive -File \"${env:COPILOT_PLUGIN_ROOT}\\scripts\\install-msbuild-extractor.ps1\" }",
+        "timeoutSec": 120
+      }
+    ]
+  }
+}

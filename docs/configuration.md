@@ -25,15 +25,15 @@ If you install the package globally, npm adds the `mscppls` executable to your `
 
 See the [command line reference](./command-line-options.md) for available flags.
 
-## Startup working directory
+## Automatic configuration directory
 
-The plugin starts the server in Copilot CLI's session directory using `${COPILOT_SESSION_CWD}`. This requires a CLI build with session-directory support.
+The plugin passes Copilot CLI's session directory through `MSCPPLS_AUTO_CONFIGURE_DIRECTORY` using `${COPILOT_SESSION_CWD}`, without changing the server's working directory. This requires a CLI build with session-directory support and a server build that supports the override.
 
 To choose a compilation database explicitly, use `.mscppls/cpp-lsp.json` as described above.
 
 ## Minimal configuration (automatic discovery)
 
-If you omit the `--lsp-config` argument (or pass `--allow-missing-lsp-config`), the language server automatically searches its startup working-directory cone for a single `compile_commands.json`. The client workspace still determines the indexing scope. In this mode you don't need a `cpp-lsp.json` file or a `repositoryPath`:
+If you omit the `--lsp-config` argument (or pass `--allow-missing-lsp-config`), the language server automatically searches its automatic configuration directory cone for a single `compile_commands.json`. This defaults to the startup working directory when no override is set. The client workspace still determines the indexing scope. In this mode you don't need a `cpp-lsp.json` file or a `repositoryPath`:
 
 ```json
 {
@@ -41,7 +41,9 @@ If you omit the `--lsp-config` argument (or pass `--allow-missing-lsp-config`), 
     "cpp": {
       "command": "mscppls",
       "args": [],
-      "cwd": "${COPILOT_SESSION_CWD}",
+      "env": {
+        "MSCPPLS_AUTO_CONFIGURE_DIRECTORY": "${COPILOT_SESSION_CWD}"
+      },
       "fileExtensions": {
         ".cpp": "cpp",
         ".c": "cpp",

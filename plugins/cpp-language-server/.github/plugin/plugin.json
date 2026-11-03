@@ -22,8 +22,8 @@
       "args": [
         "@microsoft/cpp-language-server"
       ],
-      "cwd": "${COPILOT_SESSION_CWD}",
       "env": {
+        "MSCPPLS_AUTO_CONFIGURE_DIRECTORY": "${COPILOT_SESSION_CWD}",
         "MSCPPLS_PLUGIN_SOURCE": "public"
       },
       "fileExtensions": {

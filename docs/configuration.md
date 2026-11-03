@@ -27,17 +27,9 @@ See the [command line reference](./command-line-options.md) for available flags.
 
 ## Startup working directory
 
-The plugin sets its LSP launch directory to `${COPILOT_SESSION_CWD}`, which requires a Copilot CLI build that supplies the session working directory during server launch. It does not substitute the Git root or plugin installation directory.
+The plugin starts the server in Copilot CLI's session directory using `${COPILOT_SESSION_CWD}`. This requires a CLI build with session-directory support.
 
-With an MSCPPLS build that supports `MSCPPLS_WORKING_DIRECTORY`, set it before starting Copilot CLI to override the server's inherited working directory:
-
-```powershell
-$env:MSCPPLS_WORKING_DIRECTORY = 'C:\repo\apps\demo'
-```
-
-Only an existing directory that the server can enter takes effect. Unset, empty, nonexistent, or file-valued settings leave the CLI-selected directory unchanged. Relative values resolve against that directory. Restart the server after changing the variable.
-
-Explicit `--workspace-config` and `auto_configure_directory` settings retain their existing precedence. The variable does not change the client workspace used for indexing or enable automatic MSBuild extraction.
+To choose a compilation database explicitly, use `.mscppls/cpp-lsp.json` as described above.
 
 ## Minimal configuration (automatic discovery)
 

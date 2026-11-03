@@ -11,7 +11,7 @@ _The Microsoft C++ Language Server is currently in preview and may be subject to
 Before you get started, make sure you have:
 
 - An active [GitHub Copilot](https://github.com/features/copilot) subscription
-- [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli)
+- [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli) with session-directory support, tested with prerelease `1.0.106-5`
 - [npm](https://www.npmjs.com/package/npm?activeTab=readme)
 
 <a id="-quick-start"></a>
@@ -28,7 +28,7 @@ Before you get started, make sure you have:
 
 2. Run `npx @microsoft/cpp-language-server --accept-eula --login` to accept the [license terms](https://www.npmjs.com/package/@microsoft/cpp-language-server?activeTab=code) and login to GitHub. An active GitHub Copilot subscription is required.
 3. Create a [`compile_commands.json` file](./docs/compile-commands.md) for your project. For CMake or MSBuild (vcxproj) projects, run the [`generate-compile-commands` skill](./plugins/cpp-language-server/skills/generate-compile-commands/SKILL.md) in GitHub Copilot CLI with a prompt like "regenerate compile commands" or "load project" to generate the file and configure the language server. See the [build-system guides](./docs/compile-commands.md) for manual setup and custom builds.
-4. Launch GitHub Copilot CLI from your project root directory.
+4. Launch GitHub Copilot CLI from your project directory.
 5. Within GitHub Copilot CLI, run `/lsp show`. You should see a "cpp" server running.
 6. Use GitHub Copilot CLI like normal, now with enhanced C++ capabilities. To nudge the agent to use the tools, try adding phrases like "use LSP tools" to your prompt.
 

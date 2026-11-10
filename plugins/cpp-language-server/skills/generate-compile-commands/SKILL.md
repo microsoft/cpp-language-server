@@ -49,6 +49,8 @@ For MSBuild (`.sln`, `.slnx`, `.vcxproj`), the **only** correct way to produce `
 - **Do not invoke `cl.exe`, `clang`, or `clang-cl` directly** to build a compile database, and do not scrape a build log. The extractor does this correctly via design-time evaluation.
 - **Do not compile the project first.** Extraction is design-time: it evaluates projects and runs `GetClCommandLines`; it does **not** compile anything and does not need build outputs to exist.
 
+The plugin's `sessionStart` hook installs the extractor on Windows. Running it requires the .NET 10 SDK.
+
 ### Run it directly in one step
 
 The extractor is fast and design-time, so a **single invocation** is expected. Do not explore the repository extensively, run a test build, or re-run the extractor to "confirm" the result. Locate the project file, resolve the configuration once (tiered procedure below), run the command once, and stop. One retry is allowed only after a nonzero extractor exit: if it failed because restore/init-generated props, targets, or package files are missing (common in C++/WinRT and restore-heavy repos), run the repo's documented restore or init once (e.g. `nuget restore`; not a test build), then retry extraction once. After a successful extraction with output present, stop.
@@ -64,11 +66,12 @@ The correct configuration and platform are the **project's own default**, never 
 
 #### Tier 1: a committed `msbuild-extractor.json` exists (primary, correct by construction)
 
-A committed `msbuild-extractor.json` next to the solution already declares the intended `configuration`, `platform`, and inputs, and reproduces identically on any machine and installed platform set. Pass its path **explicitly** with `--config`, and pass the declared `solutions` value as `--solution`; that plus `-o` is the whole command. Do **not** pass `-c`/`-a` (they would override the committed configuration and platform), and do **not** rely on bare auto-discovery: the v0.3.0 extractor auto-discovers `msbuild-extractor.json` only from the current working directory, so running from any other directory silently falls back to `Debug`/`x64` and produces a wrong-platform database. Passing `--config` is robust to the working directory.
+A committed `msbuild-extractor.json` next to the solution already declares the intended `configuration`, `platform`, and inputs, and reproduces identically on any machine and installed platform set. Pass its path **explicitly** with `--config`, and pass the declared `solutions` value as `--solution`; that plus `-o` is the whole command. Do **not** pass `-c`/`-a` (they would override the committed configuration and platform), and do **not** rely on bare auto-discovery: the extractor auto-discovers `msbuild-extractor.json` only from the current working directory, so running from any other directory silently falls back to `Debug`/`x64` and produces a wrong-platform database. Passing `--config` is robust to the working directory.
 
 ```powershell
+$extractor = (Get-ChildItem "$env:LOCALAPPDATA\mscppls\msbuild-extractor\public\Microsoft.VisualStudio.Cpp.MSBuildExtractor.*\tools\msbuild-extractor-sample.exe" | Select-Object -First 1).FullName
 New-Item -ItemType Directory -Path .mscppls -Force | Out-Null
-msbuild-extractor-sample.exe `
+& $extractor `
   --config <path>\msbuild-extractor.json `
   --solution <the declared solution> `
   -o .mscppls\compile_commands.json
@@ -87,8 +90,9 @@ This tier applies **only when no committed `msbuild-extractor.json` exists**. If
 Then run the extractor with that exact configuration and platform:
 
 ```powershell
+$extractor = (Get-ChildItem "$env:LOCALAPPDATA\mscppls\msbuild-extractor\public\Microsoft.VisualStudio.Cpp.MSBuildExtractor.*\tools\msbuild-extractor-sample.exe" | Select-Object -First 1).FullName
 New-Item -ItemType Directory -Path .mscppls -Force | Out-Null
-msbuild-extractor-sample.exe `
+& $extractor `
   --solution <the committed .sln or .slnx> `
   -c <the solution's default configuration> -a <the solution's default platform> `
   -o .mscppls\compile_commands.json
@@ -121,38 +125,12 @@ Changing the flag set changes the entry set, the most common way to produce the 
 - **Do not pass** `--all-configurations`, `--merge`, `--deduplicate`, or `--validate` unless the user asks; `--validate` compiles every TU with `cl.exe` and is slow.
 - **Do not create, edit, or delete a committed `msbuild-extractor.json`.** Authoring a new one is only the offered follow-up after a Tier 2 run.
 
-### If the extractor is not already available
-
-The extractor is typically already built and available: try `msbuild-extractor-sample.exe` on `PATH`, or `.tools\msbuild-extractor-sample.exe`, before downloading. If present, use it and skip the download.
-
-If it is not present, download the pinned release and verify its SHA256 before trusting it. The binary is self-contained, with no .NET runtime needed.
-
-```powershell
-$version  = 'v0.3.0'
-$expected = '543c5cc6b57a1b3eb46b11e56b8f35a9ca8676106426bde6041ca2dc2e06f13c'
-$exe      = ".tools\msbuild-extractor-sample.exe"
-
-if (-not (Test-Path $exe) -or (Get-FileHash $exe -Algorithm SHA256).Hash -ne $expected.ToUpper()) {
-  New-Item -ItemType Directory -Path ".tools" -Force | Out-Null
-  $tmp = "$exe.download"
-  Invoke-WebRequest -Uri "https://github.com/microsoft/msbuild-extractor-sample/releases/download/$version/msbuild-extractor-sample.exe" -OutFile $tmp
-  $actual = (Get-FileHash $tmp -Algorithm SHA256).Hash
-  if ($actual -ne $expected.ToUpper()) {
-    Remove-Item $tmp -Force
-    throw "SHA256 mismatch`n  expected: $expected`n  actual:   $actual"
-  }
-  Move-Item $tmp $exe -Force
-}
-```
-
-When upgrading the pinned version, get the new SHA256 from the `digest` field of the asset at `https://api.github.com/repos/microsoft/msbuild-extractor-sample/releases/latest`. If downloaded to `.tools\`, invoke `.tools\msbuild-extractor-sample.exe` in the recipes above.
-
 ### Developer environment (fallback only)
 
 The default path passes no toolchain-selection flags and lets the extractor resolve MSVC via `vswhere`. Do not add `--use-dev-env` routinely. Use it only when default `vswhere` resolution fails, or when the user explicitly wants to index the already-active Developer environment (a Developer Command Prompt / Developer PowerShell, or a shell where `vcvarsall.bat` set `VCINSTALLDIR`, `INCLUDE`, `LIB`). It makes the extractor honor that environment instead of re-resolving via `vswhere`:
 
 ```powershell
-msbuild-extractor-sample.exe `
+& $extractor `
   --use-dev-env `
   --solution <the committed .sln or .slnx> `
   -o .mscppls\compile_commands.json
@@ -165,8 +143,8 @@ msbuild-extractor-sample.exe `
 If `vswhere` picks the wrong one, list and select explicitly:
 
 ```powershell
-msbuild-extractor-sample.exe --list-instances
-msbuild-extractor-sample.exe --vs-instance <id> --solution <the committed .sln or .slnx> -o .mscppls\compile_commands.json
+& $extractor --list-instances
+& $extractor --vs-instance <id> --solution <the committed .sln or .slnx> -o .mscppls\compile_commands.json
 ```
 
 (Add `-c`/`-a` in Tier 2 as above.)
@@ -198,7 +176,7 @@ The fix is **out-of-process mode**: spawn the repo's own MSBuild.exe via `--msbu
 Example (the Windows driver samples built with the Enterprise WDK; the version folders track the EWDK build, here `18` / `v180` / `14.50.35717`, so confirm them after mounting):
 
 ```powershell
-.tools\msbuild-extractor-sample.exe `
+& $extractor `
   --msbuild-path "D:\Program Files\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe" `
   --solution general\echo\kmdf\kmdfecho.sln `
   -c Debug -a x64 `
